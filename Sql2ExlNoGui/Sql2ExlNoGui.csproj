@@ -41,6 +41,8 @@
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Data.OracleClient" />
+    <Reference Include="System.EnterpriseServices" />
+    <Reference Include="System.Web.Services" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="Microsoft.CSharp" />
@@ -48,7 +50,6 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="clsAux.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Properties\Settings.Designer.cs">
@@ -58,13 +59,17 @@
     </Compile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="app.config" />
+    <None Include="App.config" />
     <None Include="Properties\Settings.settings">
       <Generator>SettingsSingleFileGenerator</Generator>
       <LastGenOutput>Settings.Designer.cs</LastGenOutput>
     </None>
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\ConsoleLib\ConsoleLib.csproj">
+      <Project>{461ce98f-4281-4833-92fe-331c5c91bec3}</Project>
+      <Name>ConsoleLib</Name>
+    </ProjectReference>
     <ProjectReference Include="..\..\Export2ExlEngine\Export2ExlEngine.csproj">
       <Project>{f4cba9d4-c433-4f29-846d-329624ee37af}</Project>
       <Name>Export2ExlEngine</Name>
@@ -73,10 +78,16 @@
       <Project>{8cf89f01-465c-4864-84e3-d1a2eb401141}</Project>
       <Name>IgalControls</Name>
     </ProjectReference>
-    <ProjectReference Include="..\..\IgalDAL\IgalDAL.csproj">
+    <ProjectReference Include="..\..\IgalDAL\IgalDAL\IgalDAL.csproj">
       <Project>{3c3911df-438c-4c60-8015-12e44d70b67b}</Project>
       <Name>IgalDAL</Name>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <WCFMetadata Include="Connected Services\" />
+  </ItemGroup>
+  <ItemGroup>
+    <WebReferences Include="Web References\" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

@@ -1,0 +1,12 @@
+<?xml version='1.0' encoding='windows-1255'?>
+<SettingsFile xmlns="http://schemas.microsoft.com/VisualStudio/2004/01/settings" CurrentProfile="(Default)" GeneratedClassNamespace="Sql2ExlNoGui.Properties" GeneratedClassName="Settings">
+  <Profiles />
+  <Settings>
+    <Setting Name="ReleasePath" Type="System.String" Scope="User">
+      <Value Profile="(Default)">d:\</Value>
+    </Setting>
+    <Setting Name="CheckForUpdate" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
+    </Setting>
+  </Settings>
+</SettingsFile>

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -22,6 +22,7 @@ namespace Sql2Xl
         Export2Exl XlUtil;
         Export2Csv CsvUtil;
         Export2ExlEngine.ExportType xportType = ExportType.Excel;
+        bool bServerIsDirty;
 
         #region Form Basic Actions
         public frmSqlExport()
@@ -29,9 +30,19 @@ namespace Sql2Xl
             _IsInitializing = true;
             InitializeComponent();
             this.Resize += new System.EventHandler(ResizeMe);
-            string[] myServers = ConfigurationManager.AppSettings["DBServers"].Split(',');
-            cmbServers.Items.AddRange(myServers);
+            try
+            {
+                string[] myServers = ConfigurationManager.AppSettings["DBServers"].Split(',');
+                cmbServers.Items.AddRange(myServers);
+            }
+            catch (Exception ex)
+            {
+
+            }
+            
             this.WindowState = FormWindowState.Maximized;
+            string sVersion = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString();
+            lblVersion.Text = sVersion;
         }
         private void frmSqlExport_Load(object sender, EventArgs e)
         {
@@ -52,10 +63,13 @@ namespace Sql2Xl
         #endregion
 
         #region Visuality
-        private void p_EnableButtons(bool p)
-        {            
-            btnExlExport.Enabled = p;
-            btnShow.Enabled = p;
+        private void p_EnableButtons(bool bEnabled)
+        {
+            //if (!bEnabled) txtSql.Focus(); //when bEnabled is false - on disabling btnShow - the focus jumps to 
+
+            btnExlExport.Enabled = bEnabled;
+            btnExportAll.Enabled = bEnabled;
+            btnShow.Enabled = bEnabled;            
         }
 
         private void ResizeMe(object sender, EventArgs e)
@@ -77,14 +91,15 @@ namespace Sql2Xl
         private void SaveSettings()
         {
             Properties.Settings.Default.MyServer = cmbServers.Text;
-            Properties.Settings.Default.MyDB = cmbDB.Text;          
+            Properties.Settings.Default.MyDB = cmbDB.Text;
+            Properties.Settings.Default.MyTimeOut = Int16.Parse( txtTimeOut.Value.ToString());
             Properties.Settings.Default.Save();            
         }
 
         private void LoadSettings()
         {
-            cmbServers.Text = Properties.Settings.Default.MyServer;
-            cmbDB.SelectedIndex = -1;
+            txtTimeOut.Value = Properties.Settings.Default.MyTimeOut;
+            cmbServers.Text = Properties.Settings.Default.MyServer;                        
             cmbDB.Text = Properties.Settings.Default.MyDB;
             if (cmbDB.SelectedIndex == -1)
                 cmbDB.Text = "";            
@@ -95,13 +110,14 @@ namespace Sql2Xl
         #region Sql section
         private void GetDataBaseList()
         {
-            sCon = "server=" + cmbServers.Text + ";initial catalog=master;Integrated Security=true;";
+            sCon = $"server={cmbServers.Text};initial catalog=master;Integrated Security=true;";
             try
             {
                 cmbDB.DataSource = DataBaseList(chkExcludeSystem.Checked);
                 cmbDB.DisplayMember = "name";
                 cmbDB.ValueMember = "name";
-            }
+                bServerIsDirty = false;
+            }            
             catch (Exception ex)
             {
                 MessageBox.Show(ex.Message);
@@ -132,7 +148,7 @@ namespace Sql2Xl
 
         #region Controls Behaviour
         private void cmbServers_SelectedIndexChanged(object sender, EventArgs e)
-        { GetDataBaseList(); }       
+        { bServerIsDirty = true; GetDataBaseList(); }       
 
         private void cmbDB_SelectedIndexChanged(object sender, EventArgs e)
         {            sCon = BuildConnString();        }
@@ -147,6 +163,7 @@ namespace Sql2Xl
                     cmbDB.Text = "";
                 }
                 sServer = cmbServers.Text.Trim();
+                bServerIsDirty = true;                
             }
             catch (Exception ex)
             {
@@ -159,13 +176,13 @@ namespace Sql2Xl
         {            sDB = cmbDB.Text.Trim();        }
 
         private void cmbServers_Validated(object sender, EventArgs e)
-        {            GetDataBaseList();        }
+        {    if (bServerIsDirty)        GetDataBaseList();        }
 
         private void chkExcludeSystem_CheckedChanged(object sender, EventArgs e)
         {            GetDataBaseList(); }
 
-        private void cmbTables_SelectedIndexChanged(object sender, EventArgs e)
-        {
+        private async void cmbTables_SelectedIndexChanged(object sender, EventArgs e)
+        {            
             if (_IsInitializing == true)
                 return;
 
@@ -173,8 +190,8 @@ namespace Sql2Xl
             ShowData(iIndex);
         } 
 
-        private void btnShow_Click(object sender, EventArgs e)
-        {
+        private async void btnShow_Click(object sender, EventArgs e)
+        {          
             string ErrMsg = "";
 
             if (txtSql.Text.Trim()=="")
@@ -183,40 +200,63 @@ namespace Sql2Xl
                 return;
             }
 
-            sCon = BuildConnString();            
+            sCon = BuildConnString();
 
+            SqlDAC.SetCommandTimeOut ((int)txtTimeOut.Value);
             if (!SqlDAC.ParseSql(sCon, txtSql.Text, out ErrMsg))
             {
                 MessageBox.Show(ErrMsg, "ScriptCreate error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
 
-            cmbTables.Items.Clear();            
-            try
+            cmbTables.Items.Clear();
+            grdSummary.DataSource = null;
+            p_EnableButtons(false);
+            Task<int> task = new Task<int>(RunQuery);
+            task.Start();
+            int iCount = await task;
+            if (iCount > 0)
             {
-                dsAllQrys = SqlDAC.ExecuteDataset(sCon, CommandType.Text, txtSql.Text, null);
                 for (int i = 0; i < dsAllQrys.Tables.Count; i++)
                 {
                     cmbTables.Items.Add(dsAllQrys.Tables[i].TableName);
                 }
-                if (cmbTables.Items.Count > 0)
-                    cmbTables.SelectedIndex = 0;
+            }
+            if (cmbTables.Items.Count > 0)
+                cmbTables.SelectedIndex = 0;            
+
+            p_EnableButtons(true);            
+        }
+
+        delegate void SetTextCallback(string text);
+
+        private void SetText(string txt)
+        {
+            if(lblRecCount.InvokeRequired)
+            {
+                SetTextCallback d = new SetTextCallback(SetText);
+                lblRecCount.Invoke(d, new object[] { txt });
+            }
+            else
+                lblRecCount.Text = txt;
+        }
+
+        private int RunQuery()
+        {
+            SetText("Processing query...");
+
+            try
+            {
+                dsAllQrys = SqlDAC.ExecuteDataset(sCon, CommandType.Text, txtSql.Text, null);
+                return dsAllQrys.Tables.Count;
             }
             catch (Exception ex)
             {
                 MessageBox.Show(ex.Message);
+                SetText("");
+                return 0;
             }
-        }
-
-        private void txtServer_Validated(object sender, EventArgs e)
-        {
-            sServer = cmbServers.Text.Trim();
-        }
-
-        private void txtDB_Validated(object sender, EventArgs e)
-        {
-            sDB = cmbDB.Text.Trim();
-        }
+        }        
 
         private void btnExlExport_Click(object sender, EventArgs e)
         {
@@ -269,8 +309,7 @@ namespace Sql2Xl
         }
 
         private void btnExportAll_Click(object sender, EventArgs e)
-        {
-
+        {            
             int m_exported = 0;
 
             try
@@ -291,7 +330,7 @@ namespace Sql2Xl
                 m_exported = 0;
                 p_EnableButtons(true);
                 this.Cursor = Cursors.Arrow;
-                XlUtil.Dispose();
+                //XlUtil.Dispose();
             }
         }
 
@@ -302,6 +341,7 @@ namespace Sql2Xl
                 this.Cursor = Cursors.WaitCursor;
 
                 grdSummary.DataSource = dsAllQrys.Tables[Index];
+                lblRecCount.Text = dsAllQrys.Tables[Index].Rows.Count.ToString("#,#");
 
                 grdSummary.ColumnHeadersVisible = true;
             }
